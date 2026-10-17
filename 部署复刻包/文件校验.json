@@ -2,7 +2,6 @@
   ".gitignore": "64c46e1ef9f700281878f9b47b2d5bb00e35c11db96b6b47bb292d80539dd96f",
   "oauth-import-direct.example.json": "43a6d731c6300d182fd40271193e0e994e158b51a99b16bb9400a5e4b8090fae",
   "oauth-import-proxy.example.json": "d8b9729893880c817625c52bc4cea92d5e82c32bfe6d7aef306c481df73d37c0",
-  "交给Codex执行.md": "fd53fa456b24db3bc744d3c641ce0e5d78b8a3e7be749d0ac3e444a392a54922",
   "停止中转站.bat": "b2aad57e69f5a3e259878aac8d928c754c0125c4d56567893e7392aafdf2a469",
   "启动中转站.bat": "99c281e857984ee063821a2617027c191223a55fff1a55ecad80a74f76729fc8",
   "备份数据.bat": "b1c3d11008e0ab9e7108e647808ce7cb29482c1e2594c9ccfaed32f9f77e2bab",
