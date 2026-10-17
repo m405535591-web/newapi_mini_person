@@ -1,0 +1,13 @@
+{
+  "version": "v1.0.0-rc.44",
+  "sha256": "e5a2ac5059ff4e487bc3fe25378123740b510a0fd62c3bd9b735ba8182f212f3",
+  "port": 18327,
+  "download_proxy": "http://127.0.0.1:7890",
+  "channel_proxy": "http://127.0.0.1:7890",
+  "upstream_proxy": "",
+  "session_active_limit": 500,
+  "session_issuance_limit": 2000,
+  "admin_username": "admin",
+  "public_base_url": "",
+  "no_proxy": "localhost,127.0.0.0/8,0.0.0.0,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10"
+}

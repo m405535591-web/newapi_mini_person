@@ -1,0 +1,12 @@
+{
+  "mode": "single",
+  "channel": {
+    "type": 57,
+    "name": "ChatGPT OAuth proxy",
+    "status": 1,
+    "key": "{\"access_token\": \"REPLACE_ACCESS_TOKEN\", \"account_id\": \"REPLACE_ACCOUNT_ID\", \"refresh_token\": \"REPLACE_REFRESH_TOKEN_OR_REMOVE\"}",
+    "models": "REPLACE_WITH_AVAILABLE_MODEL_NAMES",
+    "group": "default",
+    "setting": "{\"proxy\": \"http://127.0.0.1:7890\"}"
+  }
+}

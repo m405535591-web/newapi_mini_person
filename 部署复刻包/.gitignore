@@ -1,0 +1,11 @@
+bin/
+config/settings.json
+data/
+logs/
+cache/
+temp/
+downloads/
+backups/
+config/admin-credentials.txt
+config/oauth-import-api.json
+config/newapi-admin-token.json
