@@ -35,6 +35,63 @@ $values = @{
     SQL_DSN = ''; LOG_SQL_DSN = ''; REDIS_CONN_STRING = ''
     SESSION_COOKIE_SECURE = 'false'; SESSION_COOKIE_TRUSTED_URL = ''
 }
+# Keep this handle open until PowerShell exits, including console closure.
+# All child processes inherit membership; Windows kills them on handle close.
+Add-Type -TypeDefinition @"
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+public static class RelayConsoleJob {
+    private static IntPtr job;
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BasicLimits {
+        public long ProcessTime, JobTime;
+        public uint Flags;
+        public UIntPtr MinWorkingSet, MaxWorkingSet;
+        public uint ActiveProcesses;
+        public UIntPtr Affinity;
+        public uint Priority, Scheduling;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IoCounters {
+        public ulong ReadOps, WriteOps, OtherOps, ReadBytes, WriteBytes, OtherBytes;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ExtendedLimits {
+        public BasicLimits Basic;
+        public IoCounters Io;
+        public UIntPtr ProcessMemory, JobMemory, PeakProcessMemory, PeakJobMemory;
+    }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateJobObject(IntPtr attributes, string name);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetInformationJobObject(IntPtr handle, int infoClass,
+        ref ExtendedLimits limits, uint size);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AssignProcessToJobObject(IntPtr handle, IntPtr process);
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
+    public static void Attach() {
+        if (job != IntPtr.Zero) return;
+        IntPtr handle = CreateJobObject(IntPtr.Zero, null);
+        if (handle == IntPtr.Zero) throw new Win32Exception();
+        var limits = new ExtendedLimits();
+        limits.Basic.Flags = 0x2000; // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if (!SetInformationJobObject(handle, 9, ref limits,
+                (uint)Marshal.SizeOf(typeof(ExtendedLimits))) ||
+                !AssignProcessToJobObject(handle, GetCurrentProcess())) {
+            int error = Marshal.GetLastWin32Error();
+            CloseHandle(handle);
+            throw new Win32Exception(error);
+        }
+        job = handle;
+    }
+}
+"@
+[RelayConsoleJob]::Attach()
+$proc = $null
 $old = @{}
 try {
     foreach ($key in $values.Keys) {
@@ -44,7 +101,7 @@ try {
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $logDir = Join-Path $root 'logs'
     $arguments = '--port ' + $cfg.port + ' --log-dir "' + $logDir + '"'
-    $proc = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir "stdout-$stamp.log") -RedirectStandardError (Join-Path $logDir "stderr-$stamp.log") -PassThru
+    $proc = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $root -NoNewWindow -RedirectStandardOutput (Join-Path $logDir "stdout-$stamp.log") -RedirectStandardError (Join-Path $logDir "stderr-$stamp.log") -PassThru
     @{pid=$proc.Id; started=$proc.StartTime.ToUniversalTime().ToString('o'); executable=$exe} | ConvertTo-Json | Set-Content -LiteralPath $pidFile -Encoding UTF8
     $ready = $false
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
@@ -57,7 +114,21 @@ try {
     }
     if (!$ready) { throw '启动检查超时，请查看 logs 目录。' }
     Write-Host "中转站已启动： http://localhost:$($cfg.port) (PID $($proc.Id))"
-    Write-Host '支持局域网访问，浏览器打开本机 IP 地址的 18327 端口。'
+    Write-Host "支持局域网访问，浏览器打开本机 IP 地址的 $($cfg.port) 端口。"
+    Write-Host '请保持此 CMD 窗口打开；关闭窗口或按 Ctrl+C 将自动停止中转站。'
+    Write-Host "运行日志：$logDir"
+    while (!$proc.WaitForExit(500)) {}
+    Write-Host '中转站已停止。'
+    if ($proc.ExitCode -ne 0) { throw "服务进程已退出（代码 $($proc.ExitCode)），请查看 logs 目录。" }
 } finally {
+    if ($proc) {
+        if (!$proc.HasExited) { Stop-Process -Id $proc.Id -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $pidFile) {
+            $current = Get-Content -LiteralPath $pidFile -Raw | ConvertFrom-Json
+            if ($current.pid -eq $proc.Id -and $current.started -eq $proc.StartTime.ToUniversalTime().ToString('o')) {
+                Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
     foreach ($key in $old.Keys) { [Environment]::SetEnvironmentVariable($key, $old[$key], 'Process') }
 }

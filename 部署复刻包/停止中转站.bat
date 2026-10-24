@@ -23,4 +23,4 @@ if ($proc) {
     $proc.WaitForExit(10000) | Out-Null
     Write-Host '中转站已停止，数据库将在下次启动时自动恢复未完成日志。'
 }
-Remove-Item -LiteralPath $pidFile -Force
+Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue

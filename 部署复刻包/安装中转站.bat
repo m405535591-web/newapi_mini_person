@@ -66,8 +66,18 @@ try {
         if ($lan) { $public = 'http://' + $lan.IPv4Address[0].IPAddress + ':' + $template.port } else { $public = $local }
     }
     "Username: $($template.admin_username)`r`nPassword: $password`r`nURL: $public`r`n" | Set-Content -LiteralPath (Join-Path $root 'config\admin-credentials.txt') -Encoding UTF8
-    & cmd.exe /d /c ('"' + $startFile + '" --no-pause')
-    if ($LASTEXITCODE -ne 0) { throw '服务启动失败，请检查日志。' }
+    # Keep the service console open while installation continues separately.
+    $launcher = Start-Process -FilePath $env:ComSpec -ArgumentList ('/d /c ""' + $startFile + '" --no-pause"') -WorkingDirectory $root -WindowStyle Normal -PassThru
+    $ready = $false
+    for ($attempt = 0; $attempt -lt 90; $attempt++) {
+        if ($launcher.HasExited) { throw '启动窗口已关闭，请检查启动提示和日志。' }
+        try {
+            $status = Invoke-RestMethod -Uri ($local + '/api/status') -TimeoutSec 2
+            if ($status.success) { $ready = $true; break }
+        } catch {}
+        Start-Sleep -Milliseconds 500
+    }
+    if (!$ready) { throw '服务启动超时，请检查启动窗口和日志。' }
     $web = New-Object Microsoft.PowerShell.Commands.WebRequestSession
     function Invoke-LocalApi($path, $body, $headers) {
         $args = @{Uri=($local+$path);WebSession=$web;TimeoutSec=30;ErrorAction='Stop'}
@@ -107,6 +117,7 @@ try {
     Invoke-LocalApi '/api/user/auth/logout' @{} $headers | Out-Null
     Write-Host ('部署完成：' + $public)
     Write-Host '账号密码：config/admin-credentials.txt；管理 API Key：config/newapi-admin-token.json。'
+    Write-Host '请保持服务 CMD 窗口打开，关闭该窗口将停止服务。'
     Write-Host '无开机自启。访问账号是否走代理，在每个渠道内单独配置。'
 } catch {
     throw ('部署未完成：' + $_.Exception.Message + '；如已生成数据库，不要重复覆盖，交给 Codex 检查并续做。')
